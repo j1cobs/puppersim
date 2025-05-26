@@ -20,6 +20,7 @@ import torch.optim as optim  # Optimizers for training neural networks
 import tyro              # For parsing command-line arguments
 from torch.distributions.normal import Normal  # For continuous action sampling
 from torch.utils.tensorboard import SummaryWriter  # For logging training progress
+from typing import Optional
 
 # =========================
 # Hyperparameters and Config
@@ -40,7 +41,7 @@ class Args:
     """If True, log experiment to Weights & Biases (wandb) for visualization"""
     wandb_project_name: str = "cleanRL"
     """Project name for wandb logging"""
-    wandb_entity: str = None
+    wandb_entity: Optional[str] = None
     """Team/entity for wandb logging"""
     capture_video: bool = False
     """If True, record videos of the agent's performance"""
@@ -84,7 +85,7 @@ class Args:
     """Weight for value function loss (balances policy and value learning)"""
     max_grad_norm: float = 0.5
     """Maximum gradient norm (prevents exploding gradients)"""
-    target_kl: float = None
+    target_kl: Optional[float] = None
     """Target KL divergence (can be used to stop updates early if policy changes too much)"""
 
     # These are calculated at runtime
@@ -276,6 +277,9 @@ if __name__ == "__main__":
         # Collect experience from the environments for num_steps
         for step in range(0, args.num_steps):
             global_step += args.num_envs  # Count total environment steps
+            if global_step % 500 == 0:
+                print(f"Global step: {global_step}")
+                print(f"Reward: {reward}")
             obs[step] = next_obs          # Store current observation
             dones[step] = next_done       # Store done flags
 
