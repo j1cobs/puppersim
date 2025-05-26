@@ -277,7 +277,7 @@ if __name__ == "__main__":
         # Collect experience from the environments for num_steps
         for step in range(0, args.num_steps):
             global_step += args.num_envs  # Count total environment steps
-            if global_step % 500 == 0:
+            if global_step % 10000 == 0:
                 print(f"Global step: {global_step}")
                 print(f"Reward: {reward}")
             obs[step] = next_obs          # Store current observation
