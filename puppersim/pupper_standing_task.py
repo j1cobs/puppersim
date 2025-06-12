@@ -1,8 +1,6 @@
-"""A simple locomotion taskand termination condition."""
+"""A simple standing task and termination condition."""
 
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
+from __future__ import absolute_import,division,print_function
 
 import numpy as np
 
@@ -18,19 +16,17 @@ from pybullet_envs.minitaur.envs_v2.utilities import env_utils_v2 as env_utils
 # Change class along with functions
 # Completely the same as locomotion task
 @gin.configurable
-class SimpleForwardTask(task_interface.Task):
-  """A basic "move forward" task."""
+class StandingTask(task_interface.Task):
+  """A basic "standing" task.  We want the robot to stand up and stay still."""
 
   def __init__(self,
                weight=1.0,
                terminal_condition=terminal_conditions
                .default_terminal_condition_for_minitaur,
-               divide_with_dt=False,
-               clip_velocity=None,
                energy_penalty_coef=0.0,
                torque_penalty_coef=0.0,
                min_com_height=None,
-               weight_action_accel=None):
+               upright_threshold=None):
     """Initializes the task.
 
     Args:
@@ -51,16 +47,12 @@ class SimpleForwardTask(task_interface.Task):
     """
     self._weight = weight
     self._terminal_condition = terminal_condition
-    self._last_base_position = None
-    self._divide_with_dt = divide_with_dt
-    self._clip_velocity = clip_velocity
-    self._weight_action_accel = weight_action_accel
-    self._action_history_sensor = None
     self._min_com_height = min_com_height
+    self.upright_threshold = upright_threshold
     self._energy_penalty_coef = energy_penalty_coef
     self._torque_penalty_coef = torque_penalty_coef
     self._env = None
-    self._step_count = 0
+
     if energy_penalty_coef < 0:
       raise ValueError("Energy Penalty Coefficient should be >= 0")
 
