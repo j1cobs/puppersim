@@ -120,10 +120,8 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
         env = gym.wrappers.ClipAction(env)
         # Normalize observations (helps learning)
         env = gym.wrappers.NormalizeObservation(env)
-        # Optionally, you could clip observations to a certain range (commented out)
-        # env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10),observation_space=clipped_obs_space)
         # Actually clip observations to [-10, 10]
-        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), env.observation_space)
+        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
         # Normalize rewards (helps learning)
         env = gym.wrappers.NormalizeReward(env, gamma=gamma)
         # Clip rewards to [-10, 10] to avoid outliers
