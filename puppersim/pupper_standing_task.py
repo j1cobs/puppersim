@@ -3,6 +3,7 @@
 from __future__ import absolute_import,division,print_function
 
 import numpy as np
+import pybullet as p
 
 import gin
 
@@ -11,6 +12,7 @@ from pybullet_envs.minitaur.envs_v2.tasks import task_interface
 from pybullet_envs.minitaur.envs_v2.tasks import task_utils
 from pybullet_envs.minitaur.envs_v2.tasks import terminal_conditions
 from pybullet_envs.minitaur.envs_v2.utilities import env_utils_v2 as env_utils
+from puppersim import pupper_v2
 
 
 # Change class along with functions
@@ -21,37 +23,36 @@ class StandingTask(task_interface.Task):
 
   def __init__(self,
                weight=1.0,
-               terminal_condition=terminal_conditions
-               .default_terminal_condition_for_minitaur,
+               terminal_condition=terminal_conditions.default_terminal_condition_for_minitaur,
                energy_penalty_coef=0.0,
                torque_penalty_coef=0.0,
-               min_com_height=None,
-               upright_threshold=None):
+               min_com_height=0.16, #Initial position = 0.17
+               upright_threshold=0.85):
     """Initializes the task.
 
     Args:
       weight: Float. The scaling factor for the reward.
       terminal_condition: Callable object or function. Determines if the task is
         done.
-      divide_with_dt: if True, we divide the velocity reward with dt.
-      clip_velocity: if not None, we will clip the velocity with this value.
-      energy_penalty_coef: Coefficient for the energy penalty that will be added
-        to the reward. 0 by default.
+      energy_penalty_coef: Penalty for energy usage.
+      torque_penalty_coef: Penalty for torque usage.
       min_com_height: Minimum height for the center of mass of the robot that
         will be used to terminate the task. This is used to obtain task specific
         gaits and set by the config or gin files based on the task and robot.
-      weight_action_accel: if not None, penalize the action acceleration.
+      upright_threshold: Minimum z-component of up vector for 'upright'.
 
     Raises:
-      ValueError: The energey coefficient is smaller than zero.
+      ValueError: The energy coefficient is smaller than zero.
     """
     self._weight = weight
     self._terminal_condition = terminal_condition
     self._min_com_height = min_com_height
-    self.upright_threshold = upright_threshold
+    self._upright_threshold = upright_threshold
     self._energy_penalty_coef = energy_penalty_coef
     self._torque_penalty_coef = torque_penalty_coef
     self._env = None
+    self._step_count = 0
+    self._initial_base_pos = None   # Drift penalty
 
     if energy_penalty_coef < 0:
       raise ValueError("Energy Penalty Coefficient should be >= 0")
@@ -61,70 +62,66 @@ class StandingTask(task_interface.Task):
 
   def reset(self, env):
     self._env = env
-    self._last_base_position = env_utils.get_robot_base_position(
-        self._env.robot)
+    robot = self._env.robot
+    # Base position for drift calculations
+    self._initial_base_pos = np.array(env_utils.get_robot_base_position(robot))
+    
+  def update(self, env):
+    pass
 
-    if self._weight_action_accel is not None:
-      sensor_name = "LastAction"
-      self._action_history_sensor = env.sensor_by_name(sensor_name)
+  def reward(self, env):
+    """Reward for standing and stable."""
+    del env
+    self._step_count += 1
+
+    robot = self._env.robot
+    base_pos = env_utils.get_robot_base_position(robot)
+    base_orientation = env_utils.get_robot_base_orientation(robot)
+    rot_matrix = p.getMatrixFromQuaternion(base_orientation)
+    up_z = rot_matrix[8]
+    
+    # Upright and high enough
+    upright = float(up_z > self._upright_threshold and base_pos[2] > self._min_com_height)
+    reward = upright
+    
+    # Better if more parallel to the floor
+    reward += (up_z / 1.0) * 0.1
+    
+    if self._initial_base_pos is not None:
+      # Calculate drift of x,y coordinates based on initial position
+      drift = np.linalg.norm(base_pos[:2] - self._initial_base_pos[:2])
+      reward -= 0.5 * drift   # Arbitrary coefficient, may need modification
+      
+    if hasattr(robot, "get_neutral_motor_angles") and hasattr(robot, "motor_angles"):
+      neutral_angles = np.array(pupper_v2.Pupper.get_neutral_motor_angles())
+      current_angles = np.array(robot.motor_angles)
+      joint_deviation = np.linalg.norm(current_angles - neutral_angles)
+      reward -= 0.1 * joint_deviation  # Arbitrary coefficient, may need modification
+
+    # Energy
+    if self._energy_penalty_coef > 0:
+      energy = np.sum(np.abs(robot.motor_torques) * np.abs(robot.motor_velocities))
+      reward -= self._energy_penalty_coef * energy
+
+    if self._torque_penalty_coef > 0:
+      torque_penalty = np.sum(np.square(robot.motor_torques))
+      reward -= self._torque_penalty_coef * torque_penalty
+
+    return reward * self._weight
+
+  def done(self, env):
+    """Ends if robot falls below min height or off balance (uprightness)"""
+    del env
+    
+    robot = self._env.robot
+    base_pos = env_utils.get_robot_base_position(robot)
+    base_orientation = env_utils.get_robot_base_orientation(robot)
+    rot_matrix = p.getMatrixFromQuaternion(base_orientation)
+    up_z = rot_matrix[8]
+    if base_pos[2] < self._min_com_height or up_z < self._upright_threshold:
+        return True
+    return self._terminal_condition(self._env)
 
   @property
   def step_count(self):
     return self._step_count
-
-  def update(self, env):
-    """Updates the internal state of the task."""
-    del env
-    self._last_base_position = env_utils.get_robot_base_position(
-        self._env.robot)
-
-  def reward(self, env):
-    """Get the reward without side effects."""
-    del env
-
-    self._step_count += 1
-    env = self._env
-    current_base_position = env_utils.get_robot_base_position(self._env.robot)
-    velocity = -(current_base_position[1] - self._last_base_position[1])#negative Y axis
-    if self._divide_with_dt:
-      velocity /= env.env_time_step
-    if self._clip_velocity is not None:
-      limit = float(self._clip_velocity)
-      velocity = np.clip(velocity, -limit, limit)
-
-    if self._weight_action_accel is None:
-      action_acceleration_penalty = 0.0
-    else:
-      past_actions = self._action_history_sensor.get_observation().T
-      action = past_actions[0]
-      prev_action = past_actions[1]
-      prev_prev_action = past_actions[2]
-      acc = action - 2 * prev_action + prev_prev_action
-      action_acceleration_penalty = (
-          float(self._weight_action_accel) * np.mean(np.abs(acc)))
-
-    reward = velocity
-    reward -= action_acceleration_penalty
-
-    # Energy
-    if self._energy_penalty_coef > 0:
-      energy_reward = -task_utils.calculate_estimated_energy_consumption(
-          self._env.robot.motor_torques, self._env.robot.motor_velocities,
-          self._env.sim_time_step, self._env.num_action_repeat)
-      reward += energy_reward * self._energy_penalty_coef
-
-    if self._torque_penalty_coef > 0:
-      torque_reward = -self._torque_penalty_coef * np.dot(
-          self._env.robot.motor_torques, self._env.robot.motor_torques)
-      reward += torque_reward
-
-    # print("Reward.", "Timestamp:", round(env.robot.GetTimeSinceReset(), 3),
-    #       "Velocity:", round(velocity, 4), "Torque:", round(torque_reward, 4))
-    return reward * self._weight
-
-  def done(self, env):
-    del env
-    position = env_utils.get_robot_base_position(self._env.robot)
-    if self._min_com_height and position[2] < self._min_com_height:
-      return True
-    return self._terminal_condition(self._env)
