@@ -433,7 +433,7 @@ if __name__ == "__main__":
             model_path,
             make_env,
             args.env_id,
-            eval_episodes=10,
+            eval_episodes=1000,
             run_name=f"{run_name}-eval",
             Model=Agent,
             device=device,
