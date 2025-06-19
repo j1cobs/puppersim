@@ -49,6 +49,8 @@ class Args:
     """Trigger videos at every x episodes"""
     save_model: bool = False
     """If True, save the trained model to disk"""
+    eval_episodes: int = 10
+    """Number of eval episodes"""
     upload_model: bool = False
     """If True, upload the model to HuggingFace Hub"""
     hf_entity: str = ""
@@ -102,7 +104,7 @@ class Args:
 # Environment Creation
 # =========================
 
-def make_env(env_id, idx, capture_video, run_name, gamma, video_trigger):
+def make_env(env_id, idx, capture_video, run_name, gamma):
     """
     Returns a function that creates a single environment instance with all necessary wrappers.
     Wrappers add features like video recording, observation normalization, reward normalization, etc.
@@ -111,7 +113,7 @@ def make_env(env_id, idx, capture_video, run_name, gamma, video_trigger):
         # If capturing video, only record from the first environment
         if capture_video and idx == 0:
             env = gym.make(env_id, render_mode='rgb_array')
-            print(video_trigger)
+            video_trigger = args.video_trigger
             if video_trigger > 0:
                 env = gym.wrappers.RecordVideo(env, f"videos/{run_name}",episode_trigger=lambda episode_id: episode_id % video_trigger == 0)
             else:
@@ -214,7 +216,7 @@ if __name__ == "__main__":
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
     args.num_iterations = args.total_timesteps // args.batch_size
     # Create a unique name for this run (for logging and saving)
-    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{time.strftime('%Y-%m-%d_%H:%M:%S', time.gmtime(time.time()))}"
+    run_name = f"{args.env_id}__{args.exp_name}__{args.seed}__{time.strftime('%Y-%m-%d_%H:%M:%S', time.localtime(time.time()))}"
 
     # If tracking with wandb, initialize it
     if args.track:
@@ -246,7 +248,7 @@ if __name__ == "__main__":
 
     # Create multiple environments for parallel data collection
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, i, args.capture_video, run_name, args.gamma, args.video_trigger) for i in range(args.num_envs)]
+        [make_env(args.env_id, i, args.capture_video, run_name, args.gamma) for i in range(args.num_envs)]
     )
     # Ensure the environment uses continuous actions (not discrete)
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
@@ -439,7 +441,7 @@ if __name__ == "__main__":
             model_path,
             make_env,
             args.env_id,
-            eval_episodes=1000,
+            eval_episodes=args.eval_episodes,
             run_name=f"{run_name}-eval",
             Model=Agent,
             device=device,
