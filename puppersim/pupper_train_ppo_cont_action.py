@@ -121,14 +121,7 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
         # Normalize observations (helps learning)
         env = gym.wrappers.NormalizeObservation(env)
         # Actually clip observations to [-10, 10]
-        original_obs_space = env.observation_space
-        clipped_obs_space = gym.spaces.Box(
-                low=-10.0, 
-                high=10.0, 
-                shape=original_obs_space.shape, 
-                dtype=original_obs_space.dtype
-        )
-        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10), clipped_obs_space)
+        env = gym.wrappers.TransformObservation(env, lambda obs: np.clip(obs, -10, 10))
         # Normalize rewards (helps learning)
         env = gym.wrappers.NormalizeReward(env, gamma=gamma)
         # Clip rewards to [-10, 10] to avoid outliers
@@ -440,7 +433,7 @@ if __name__ == "__main__":
             model_path,
             make_env,
             args.env_id,
-            eval_episodes=10,
+            eval_episodes=1000,
             run_name=f"{run_name}-eval",
             Model=Agent,
             device=device,
