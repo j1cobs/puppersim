@@ -45,6 +45,8 @@ class Args:
     """Team/entity for wandb logging"""
     capture_video: bool = False
     """If True, record videos of the agent's performance"""
+    video_trigger: int = 0
+    """Trigger videos at every x episodes"""
     save_model: bool = False
     """If True, save the trained model to disk"""
     upload_model: bool = False
@@ -100,7 +102,7 @@ class Args:
 # Environment Creation
 # =========================
 
-def make_env(env_id, idx, capture_video, run_name, gamma):
+def make_env(env_id, idx, capture_video, run_name, gamma, video_trigger):
     """
     Returns a function that creates a single environment instance with all necessary wrappers.
     Wrappers add features like video recording, observation normalization, reward normalization, etc.
@@ -109,7 +111,11 @@ def make_env(env_id, idx, capture_video, run_name, gamma):
         # If capturing video, only record from the first environment
         if capture_video and idx == 0:
             env = gym.make(env_id, render_mode='rgb_array')
-            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
+            print(video_trigger)
+            if video_trigger > 0:
+                env = gym.wrappers.RecordVideo(env, f"videos/{run_name}",episode_trigger=lambda episode_id: episode_id % video_trigger == 0)
+            else:
+                env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")                
         else:
             env = gym.make(env_id)
         # Flatten observations (useful if the environment returns a dictionary of observations)
@@ -240,7 +246,7 @@ if __name__ == "__main__":
 
     # Create multiple environments for parallel data collection
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, i, args.capture_video, run_name, args.gamma) for i in range(args.num_envs)]
+        [make_env(args.env_id, i, args.capture_video, run_name, args.gamma, args.video_trigger) for i in range(args.num_envs)]
     )
     # Ensure the environment uses continuous actions (not discrete)
     assert isinstance(envs.single_action_space, gym.spaces.Box), "only continuous action space is supported"
