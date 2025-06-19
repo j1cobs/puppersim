@@ -7,7 +7,6 @@ import pybullet as p
 
 import gin
 
-# Change imports
 from pybullet_envs.minitaur.envs_v2.tasks import task_interface
 from pybullet_envs.minitaur.envs_v2.tasks import task_utils
 from pybullet_envs.minitaur.envs_v2.tasks import terminal_conditions
@@ -15,8 +14,6 @@ from pybullet_envs.minitaur.envs_v2.utilities import env_utils_v2 as env_utils
 from puppersim import pupper_v2
 
 
-# Change class along with functions
-# Completely the same as locomotion task
 @gin.configurable
 class StandingTask(task_interface.Task):
   """A basic "standing" task.  We want the robot to stand up and stay still."""
@@ -85,7 +82,7 @@ class StandingTask(task_interface.Task):
     reward = upright
     
     # Better if more parallel to the floor
-    reward += (up_z / 1.0) * 0.1
+    reward += up_z * 0.1
     
     if self._initial_base_pos is not None:
       # Calculate drift of x,y coordinates based on initial position
