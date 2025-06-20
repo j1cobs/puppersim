@@ -24,7 +24,7 @@ class StandingTask(task_interface.Task):
                energy_penalty_coef=0.0,
                torque_penalty_coef=0.0,
                min_com_height=0.16, #Initial position = 0.17
-               upright_threshold=0.85):
+               upright_threshold=0.0):
     """Initializes the task.
 
     Args:
@@ -82,18 +82,18 @@ class StandingTask(task_interface.Task):
     reward = upright
     
     # Better if more parallel to the floor
-    reward += up_z * 0.1
+    reward += up_z ** 4
     
     if self._initial_base_pos is not None:
       # Calculate drift of x,y coordinates based on initial position
-      drift = np.linalg.norm(base_pos[:2] - self._initial_base_pos[:2])
-      reward -= 0.5 * drift   # Arbitrary coefficient, may need modification
+      drift = (1-np.linalg.norm(base_pos[:2] - self._initial_base_pos[:2]))**4
+      reward -= 0.5 * drift
       
     if hasattr(robot, "get_neutral_motor_angles") and hasattr(robot, "motor_angles"):
       neutral_angles = np.array(pupper_v2.Pupper.get_neutral_motor_angles())
       current_angles = np.array(robot.motor_angles)
-      joint_deviation = np.linalg.norm(current_angles - neutral_angles)
-      reward -= 0.1 * joint_deviation  # Arbitrary coefficient, may need modification
+      joint_deviation = (1-np.linalg.norm(current_angles - neutral_angles))**4
+      reward += joint_deviation  
 
     # Energy
     if self._energy_penalty_coef > 0:
