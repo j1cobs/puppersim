@@ -12,6 +12,7 @@ from pybullet_envs.minitaur.envs_v2.tasks import task_interface
 from pybullet_envs.minitaur.envs_v2.tasks import task_utils
 from pybullet_envs.minitaur.envs_v2.tasks import terminal_conditions
 from pybullet_envs.minitaur.envs_v2.utilities import env_utils_v2 as env_utils
+from puppersim import pupper_v2
 
 
 @gin.configurable
@@ -82,7 +83,7 @@ class StandingTask(task_interface.Task):
       reward += drift
       
     if hasattr(robot, "get_neutral_motor_angles") and hasattr(robot, "motor_angles"):
-      neutral_angles = np.array(robot.get_neutral_motor_angles())
+      neutral_angles = np.array(pupper_v2.Pupper.get_neutral_motor_angles())
       current_angles = np.array(robot.motor_angles)
       joint_deviation = (1-np.linalg.norm(current_angles - neutral_angles))**4
       reward += joint_deviation  
@@ -104,10 +105,7 @@ class StandingTask(task_interface.Task):
     
     robot = self._env.robot
     base_pos = env_utils.get_robot_base_position(robot)
-    base_orientation = env_utils.get_robot_base_orientation(robot)
-    rot_matrix = p.getMatrixFromQuaternion(base_orientation)
-    up_z = rot_matrix[8]
-    if base_pos[2] < self._min_com_height or up_z < self._upright_threshold:
+    if base_pos[2] < self._min_com_height:
         return True
     return self._terminal_condition(self._env)
 
