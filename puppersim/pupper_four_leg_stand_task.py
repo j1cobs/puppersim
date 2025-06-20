@@ -82,8 +82,8 @@ class PupperFourLegStandTask(task_interface.Task):
     
     
     robot = self._env.robot
-    roll, pitch, _ = robot.base_roll_pitch_yaw
-    return 1.0/ (0.001 + math.fabs(roll) + math.fabs(pitch))
+    roll, pitch, yaw = robot.base_roll_pitch_yaw
+    return 1.0/ (0.001 + math.fabs(roll) + math.fabs(pitch) + math.fabs(yaw))
 
   def done(self, env):
     """Ends if robot falls below min height or off balance (uprightness)"""
